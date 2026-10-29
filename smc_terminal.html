@@ -54,7 +54,7 @@ header .sp{flex:1}#st{font-size:12px;color:var(--m)}
   <header>
    <b id="tk" class="big">—</b><span id="px" class="m"></span>
    <span id="tfs"></span><span class="sp"></span><span id="st"></span>
-   <input id="api" style="width:190px;margin:0" title="URL бэкенда" placeholder="http://127.0.0.1:8000">
+   <input id="api" style="width:190px;margin:0" title="URL бэкенда" value="https://smc-backend-g3kj.onrender.com" placeholder="https://smc-backend-g3kj.onrender.com">
   </header>
   <div id="banner"></div>
   <div id="wrap"><div id="chart"></div><canvas id="ov"></canvas></div>
@@ -68,8 +68,8 @@ const $=s=>document.querySelector(s), esc=s=>String(s??'').replace(/[&<>"]/g,m=>
 const fp=p=>p==null?'—':(+p).toLocaleString('en-US',{maximumFractionDigits:p>=1000?2:p>=1?4:6});
 const MK={CRYPTO:'Криптовалюты',STOCKS:'Акции США',COMMODITIES:'Сырьё и золото'};
 const LAY={swings:'Свинги',bos:'BOS/BMS',fvg:'FVG',ob:'Order Block',eq:'EQH/EQL',range:'Range'};
-const DEFAULT_API='http://127.0.0.1:8000';
-const S={api:(localStorage.smcApi||DEFAULT_API).replace('//localhost','//127.0.0.1'),tf:'H4',T:localStorage.smcT||'BTC',demo:false,tickers:[],sigs:[],cd:[],an:null,lines:[],on:{swings:1,bos:1,fvg:1,ob:1,eq:1,range:1}};
+const DEFAULT_API = 'https://smc-backend-g3kj.onrender.com';
+const S = input('https://smc-backend-g3kj.onrender.com');
 
 /* ---------- API ---------- */
 /* Единая точка всех запросов к бэкенду: таймаут 15 с и понятные сообщения об ошибках */
