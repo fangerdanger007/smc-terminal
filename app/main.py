@@ -57,7 +57,19 @@ app = FastAPI(
     version="1.0.0",
     description="Автоматический сканер рынка по Smart Money стратегии с модулем расчёта рисков.",
     lifespan=lifespan,
-)
+@app.get("/")
+async def root():
+    return {
+        "status": "online",
+        "message": "SMC Terminal Backend is running",
+        "endpoints": {
+            "health": "/health",
+            "tickers": "/api/v1/tickers",
+            "active_signals": "/api/v1/signals/active",
+            "scanner_status": "/api/v1/scanner/status",
+            "docs": "/docs"
+        }
+    })
 
 _settings = get_settings()
 app.add_middleware(
