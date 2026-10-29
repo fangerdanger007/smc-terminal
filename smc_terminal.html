@@ -69,7 +69,8 @@ const fp=p=>p==null?'—':(+p).toLocaleString('en-US',{maximumFractionDigits:p>=
 const MK={CRYPTO:'Криптовалюты',STOCKS:'Акции США',COMMODITIES:'Сырьё и золото'};
 const LAY={swings:'Свинги',bos:'BOS/BMS',fvg:'FVG',ob:'Order Block',eq:'EQH/EQL',range:'Range'};
 const DEFAULT_API = 'https://smc-backend-g3kj.onrender.com';
-const S = input(document.getElementById('api') || DEFAULT_API);
+const S = document.getElementById('api'); 
+if (S && !S.value) S.value = localStorage.smcApi || DEFAULT_API;
 
 /* ---------- API ---------- */
 /* Единая точка всех запросов к бэкенду: таймаут 15 с и понятные сообщения об ошибках */
