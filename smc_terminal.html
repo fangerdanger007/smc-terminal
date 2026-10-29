@@ -1,0 +1,270 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SMC Terminal</title>
+<script src="https://unpkg.com/lightweight-charts@4.1.1/dist/lightweight-charts.standalone.production.js"></script>
+<style>
+:root{--bg:#0b0e14;--p:#121722;--b:#1e2636;--t:#d6dbe6;--m:#7c8798;--g:#26a69a;--r:#ef5350;--a:#f5a524;--bl:#4c8dff}
+*{box-sizing:border-box;margin:0}
+html,body{height:100%;background:var(--bg);color:var(--t);font:13px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif}
+#app{display:grid;grid-template-columns:270px 1fr 320px;height:100%}
+aside,#panel{background:var(--p);overflow:auto;padding:12px}
+aside{border-right:1px solid var(--b)}#panel{border-left:1px solid var(--b)}
+main{display:flex;flex-direction:column;min-width:0}
+h1{font-size:15px;letter-spacing:.5px}h1 span{color:var(--bl)}
+h3{font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--m);margin:14px 0 6px}
+input{width:100%;background:var(--bg);border:1px solid var(--b);color:var(--t);padding:7px 9px;border-radius:6px;margin-top:10px}
+button{background:var(--bg);border:1px solid var(--b);color:var(--m);padding:5px 11px;border-radius:6px;cursor:pointer}
+button.on,button:hover{color:var(--t);border-color:var(--bl)}
+.row{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.it{padding:7px 9px;border-radius:6px;cursor:pointer;border:1px solid transparent}
+.it:hover{background:#171e2c}.it.sel{border-color:var(--bl);background:#171e2c}
+.mk{color:var(--m);font-size:10px;margin:10px 0 2px}
+.bd{padding:1px 7px;border-radius:10px;font-size:11px;font-weight:600}
+.L{background:#26a69a22;color:var(--g)}.S{background:#ef535022;color:var(--r)}
+.m{color:var(--m)}.g{color:var(--g)}.r{color:var(--r)}
+header{display:flex;gap:8px;align-items:center;padding:8px 12px;border-bottom:1px solid var(--b);flex-wrap:wrap}
+header .sp{flex:1}#st{font-size:12px;color:var(--m)}
+#banner{display:none;background:#f5a52422;color:var(--a);padding:6px 12px;font-size:12px}
+#wrap{position:relative;flex:1;min-height:300px}#chart,#ov{position:absolute;inset:0}#ov{pointer-events:none}
+.lay{display:flex;gap:12px;padding:6px 12px;border-top:1px solid var(--b);font-size:12px;color:var(--m);flex-wrap:wrap}
+.lay label{cursor:pointer;display:flex;gap:4px;align-items:center}
+.card{background:var(--bg);border:1px solid var(--b);border-radius:8px;padding:10px;margin-bottom:10px}
+.big{font-size:15px;font-weight:700}
+.kv{display:grid;grid-template-columns:1fr auto;gap:4px 10px}.kv b{text-align:right;font-variant-numeric:tabular-nums}
+.ring{width:84px;height:84px;border-radius:50%;display:grid;place-items:center;flex:none}
+.ring i{width:64px;height:64px;border-radius:50%;background:var(--bg);display:grid;place-items:center;font:700 19px system-ui;font-style:normal}
+.bar{height:6px;background:var(--b);border-radius:3px;overflow:hidden}.bar u{display:block;height:100%;background:var(--bl)}
+.sc{display:grid;grid-template-columns:96px 1fr 34px;gap:8px;align-items:center;margin:5px 0;font-size:12px}
+.vd{font-size:12px;color:var(--a);word-break:break-word}.rs{color:var(--m);font-size:12px}
+@media(max-width:1000px){#app{grid-template-columns:1fr;height:auto}aside,#panel{max-height:none}#wrap{height:60vh;flex:none}}
+</style>
+</head>
+<body>
+<div id="app">
+ <aside>
+  <h1>SMC <span>TERMINAL</span></h1>
+  <input id="q" placeholder="Поиск тикера…" autocomplete="off">
+  <h3>Активные сигналы</h3><div id="sigs"></div>
+  <h3>Инструменты</h3><div id="list"></div>
+ </aside>
+ <main>
+  <header>
+   <b id="tk" class="big">—</b><span id="px" class="m"></span>
+   <span id="tfs"></span><span class="sp"></span><span id="st"></span>
+   <input id="api" style="width:190px;margin:0" title="URL бэкенда" placeholder="http://127.0.0.1:8000">
+  </header>
+  <div id="banner"></div>
+  <div id="wrap"><div id="chart"></div><canvas id="ov"></canvas></div>
+  <div class="lay" id="lay"></div>
+ </main>
+ <section id="panel"></section>
+</div>
+
+<script>
+const $=s=>document.querySelector(s), esc=s=>String(s??'').replace(/[&<>"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]));
+const fp=p=>p==null?'—':(+p).toLocaleString('en-US',{maximumFractionDigits:p>=1000?2:p>=1?4:6});
+const MK={CRYPTO:'Криптовалюты',STOCKS:'Акции США',COMMODITIES:'Сырьё и золото'};
+const LAY={swings:'Свинги',bos:'BOS/BMS',fvg:'FVG',ob:'Order Block',eq:'EQH/EQL',range:'Range'};
+const DEFAULT_API='http://127.0.0.1:8000';
+const S={api:(localStorage.smcApi||DEFAULT_API).replace('//localhost','//127.0.0.1'),tf:'H4',T:localStorage.smcT||'BTC',demo:false,tickers:[],sigs:[],cd:[],an:null,lines:[],on:{swings:1,bos:1,fvg:1,ob:1,eq:1,range:1}};
+
+/* ---------- API ---------- */
+/* Единая точка всех запросов к бэкенду: таймаут 15 с и понятные сообщения об ошибках */
+async function api(p){
+ const ctl=new AbortController(),tm=setTimeout(()=>ctl.abort(),15000);
+ try{
+  const r=await fetch(S.api+p,{signal:ctl.signal,headers:{Accept:'application/json'}});
+  if(!r.ok){let d='';try{d=(await r.json()).detail||''}catch(_){}throw new Error('HTTP '+r.status+(d?': '+d:''))}
+  try{return await r.json()}catch(_){throw new Error('бэкенд вернул невалидный JSON')}
+ }catch(e){
+  if(e.name==='AbortError')throw new Error('таймаут: бэкенд не ответил за 15 с');
+  if(e instanceof TypeError)throw new Error('нет связи с '+S.api+' (сервер не запущен, неверный адрес или запрос заблокирован CORS)');
+  throw e;
+ }finally{clearTimeout(tm)}
+}
+
+/* ---------- Chart ---------- */
+const wrap=$('#wrap'),ov=$('#ov');
+let chart,ser;
+/* Если библиотека не загрузилась (нет интернета, блокировка CDN) — понятная ошибка в контейнере графика.
+   Подставляем «пустышки», чтобы список тикеров и Risk Panel продолжали работать. */
+function chartError(msg){
+ $('#chart').innerHTML=`<div style="display:grid;place-items:center;height:100%;padding:20px;text-align:center;color:#ef5350">
+  <div><b style="font-size:15px">График недоступен</b><p style="color:#7c8798;margin-top:8px;max-width:520px">${esc(msg)}</p></div></div>`;
+ const none=()=>{};
+ chart={timeScale:()=>({subscribeVisibleLogicalRangeChange:none,timeToCoordinate:()=>null}),priceScale:()=>({width:()=>0})};
+ ser={setData:none,setMarkers:none,createPriceLine:none,removePriceLine:none,priceToCoordinate:()=>null};
+}
+if(!window.LightweightCharts||typeof LightweightCharts.createChart!=='function'){
+ chartError('Библиотека lightweight-charts не загрузилась с unpkg.com. Проверьте интернет-соединение, отключите блокировщик рекламы/VPN или скачайте файл библиотеки и подключите его локально тегом script.');
+}else{
+ try{
+  chart=LightweightCharts.createChart($('#chart'),{autoSize:true,layout:{background:{color:'#0b0e14'},textColor:'#7c8798'},
+   grid:{vertLines:{color:'#141a26'},horzLines:{color:'#141a26'}},rightPriceScale:{borderColor:'#1e2636'},timeScale:{borderColor:'#1e2636',timeVisible:true,rightOffset:10}});
+  ser=chart.addCandlestickSeries({upColor:'#26a69a',downColor:'#ef5350',borderVisible:false,wickUpColor:'#26a69a',wickDownColor:'#ef5350'});
+ }catch(e){chartError('Ошибка инициализации графика: '+e.message)}
+}
+let raf=0;const redraw=()=>{cancelAnimationFrame(raf);raf=requestAnimationFrame(draw)};
+chart.timeScale().subscribeVisibleLogicalRangeChange(redraw);
+new ResizeObserver(redraw).observe(wrap);
+['wheel','pointermove','pointerup'].forEach(e=>wrap.addEventListener(e,redraw,{passive:true}));
+
+/* Оверлеи (Lightweight Charts не умеет прямоугольники — рисуем на canvas поверх) */
+function draw(){
+ const w=wrap.clientWidth,h=wrap.clientHeight,d=devicePixelRatio||1;
+ if(ov.width!==w*d||ov.height!==h*d){ov.width=w*d;ov.height=h*d}
+ const x=ov.getContext('2d');x.setTransform(d,0,0,d,0,0);x.clearRect(0,0,w,h);
+ const A=S.an,cd=S.cd;if(!A||!cd.length)return;
+ const ts=chart.timeScale(),n=cd.length,R=w-chart.priceScale('right').width()-2;
+ const X=i=>ts.timeToCoordinate(cd[Math.max(0,Math.min(i,n-1))].time),Y=p=>ser.priceToCoordinate(p);
+ const col=s=>s==='BULL'?'38,166,154':'239,83,80';
+ x.font='11px system-ui';x.textBaseline='middle';
+ const txt=(t,px,py,c)=>{x.fillStyle=c;x.fillText(t,px,py)};
+ const hl=(p,i0,i1,c,dash,lab)=>{const a=X(i0),b=i1==null?R:Math.min(R,X(i1)),y=Y(p);if(a==null||b==null||y==null)return;
+  x.strokeStyle=c;x.setLineDash(dash||[]);x.beginPath();x.moveTo(a,y);x.lineTo(b,y);x.stroke();x.setLineDash([]);if(lab)txt(lab,Math.max(a,2)+4,y-7,c)};
+ const box=(i,top,bot,side,lab,ce,rgb)=>{const a=X(i),y1=Y(top),y2=Y(bot);if(a==null||y1==null||y2==null||a>=R)return;
+  rgb=rgb||col(side);x.fillStyle=`rgba(${rgb},.13)`;x.fillRect(a,y1,R-a,y2-y1);x.strokeStyle=`rgba(${rgb},.7)`;x.strokeRect(a,y1,R-a,y2-y1);
+  txt(lab,Math.max(a,2)+4,y1+9,`rgb(${rgb})`);
+  if(ce!=null){const yc=Y(ce);x.setLineDash([4,3]);x.beginPath();x.moveTo(a,yc);x.lineTo(R,yc);x.stroke();x.setLineDash([])}};
+ const last=(arr,k)=>arr.slice(-k);
+
+ if(S.on.range&&A.range){const r=A.range,i0=Math.min(r.high_index,r.low_index),c=r.valid?'#f5a524':'#7c8798';
+  hl(r.high,i0,null,c,[],'Range High 1.0');hl(r.eq,i0,null,c,[5,4],'0.5 EQ');hl(r.low,i0,null,c,[],'Range Low 0.0')}
+ if(S.on.fvg)last(A.fvgs.filter(f=>f.status!=='FILLED'),8).forEach(f=>box(f.index-1,f.top,f.bottom,f.side,'FVG '+(f.status==='PARTIAL'?'½':''),f.ce));
+ if(S.on.ob)last(A.order_blocks.filter(o=>o.status!=='INVALIDATED'),6).forEach(o=>box(o.index,o.top,o.bottom,o.side,'OB '+o.status.toLowerCase(),o.mid,'76,141,255'));
+ if(S.on.eq)last(A.equal_levels,8).forEach(e=>hl(e.level,e.indices[0],e.swept?e.swept_index:null,e.swept?'#5a6478':'#c792ea',[3,3],e.kind+(e.swept?' ✓':'')));
+ if(S.on.bos)last(A.breaks,8).forEach(b=>{hl(b.level,b.swing_index,b.index,`rgb(${col(b.side)})`,[],'');
+  const a=X(b.swing_index),e=X(b.index),y=Y(b.level);if(a!=null&&e!=null&&y!=null)txt(b.kind,(a+e)/2-10,y+(b.side==='BULL'?-8:10),`rgb(${col(b.side)})`)});
+ if(S.on.swings)last(A.swings.filter(s=>s.label),40).forEach(s=>{const a=X(s.index),y=Y(s.price);if(a!=null&&y!=null)txt(s.label,a-8,y+(s.kind==='HIGH'?-9:12),'#9aa5b8')});
+}
+
+/* Маркеры: свипы и Sponsored Candle */
+function markers(){
+ const A=S.an,cd=S.cd;if(!A){ser.setMarkers([]);return}
+ const m=[];
+ A.sweeps.slice(-10).forEach(s=>{const c=cd[s.index];if(c)m.push({time:c.time,position:s.side==='BULL'?'belowBar':'aboveBar',shape:s.side==='BULL'?'arrowUp':'arrowDown',color:'#f5a524',text:'Sweep '+s.source})});
+ A.sponsored.slice(-5).forEach(s=>{const c=cd[s.index];if(c)m.push({time:c.time,position:s.side==='BULL'?'belowBar':'aboveBar',shape:'circle',color:'#4c8dff',text:'SC'})});
+ m.sort((a,b)=>a.time-b.time);ser.setMarkers(m);
+}
+function signalLines(sig){
+ S.lines.forEach(l=>ser.removePriceLine(l));S.lines=[];if(!sig)return;
+ [[sig.entry_price,'#4c8dff','Entry',0],[sig.stop_loss,'#ef5350','SL',0],[sig.take_profit_1,'#26a69a','TP1',0],[sig.take_profit_2,'#26a69a','TP2',2]]
+  .forEach(([p,c,t,ls])=>{if(p!=null)S.lines.push(ser.createPriceLine({price:p,color:c,lineWidth:1,lineStyle:ls,axisLabelVisible:true,title:t}))});
+}
+
+/* ---------- Демо-режим (если бэкенд недоступен) ---------- */
+function demoData(){
+ const sec={D1:86400,H4:14400,H1:3600,M15:900}[S.tf],n=300,now=Math.floor(Date.now()/1000/sec)*sec;
+ let s=[...S.T].reduce((a,c)=>a+c.charCodeAt(0)*31,7),r=()=>(s=(s*16807)%2147483647)/2147483647;
+ let p=({BTC:95000,ETH:3400,XAUUSD:2742,TSLA:250,CL:72}[S.T]||100),cd=[];
+ for(let i=0;i<n;i++){const o=p,c=o*(1+(r()-.47)*.012);p=c;cd.push({time:now-(n-i)*sec,open:o,high:Math.max(o,c)*(1+r()*.004),low:Math.min(o,c)*(1-r()*.004),close:c,volume:100+r()*50})}
+ const sw=[];for(let i=2;i<n-2;i++){const k=cd[i],hi=[-2,-1,1,2].every(d=>cd[i+d].high<k.high),lo=[-2,-1,1,2].every(d=>cd[i+d].low>k.low);
+  if(hi)sw.push({index:i,price:k.high,kind:'HIGH',label:''});else if(lo)sw.push({index:i,price:k.low,kind:'LOW',label:''})}
+ let ph,pl;sw.forEach(q=>{if(q.kind==='HIGH'){if(ph)q.label=q.price>ph?'HH':'LH';ph=q.price}else{if(pl)q.label=q.price>pl?'HL':'LL';pl=q.price}});
+ const j=n-45,ob=cd[j],seg=cd.slice(-80),hi=Math.max(...seg.map(c=>c.high)),lo=Math.min(...seg.map(c=>c.low)),lw=cd.slice(-30).reduce((m,c)=>Math.min(m,c.low),1e12);
+ const an={bias:'Bullish',swings:sw,breaks:[{index:n-36,kind:'BOS',side:'BULL',level:cd[n-50].high,swing_index:n-50}],
+  sweeps:[{index:n-12,side:'BULL',source:'EQL',level:lw,extreme:lw}],sponsored:[],
+  fvgs:[{index:n-42,side:'BULL',top:cd[n-42].low,bottom:cd[n-44].high,ce:(cd[n-42].low+cd[n-44].high)/2,status:'FRESH'}],
+  order_blocks:[{index:j,side:'BULL',top:ob.high,bottom:ob.low,mid:(ob.high+ob.low)/2,status:'TESTED'}],
+  equal_levels:[{kind:'EQL',level:lw,indices:[n-70,n-40],swept:true,swept_index:n-12},{kind:'EQH',level:hi,indices:[n-80,n-60],swept:false}],
+  range:{high:hi,low:lo,eq:(hi+lo)/2,high_index:n-60,low_index:n-70,valid:true},
+  law_of_power:{side:'BULL',impulse_bars:12,correction_bars:22,ratio:1.83},amd_phase:'DISTRIBUTION'};
+ const e=(ob.high+ob.low)/2,sl=lw*.999,tp=e+3.6*(e-sl);
+ const sig={ticker:S.T,direction:'LONG',quality_score:88,risk_level:'LOW',timeframe_sync:'D1-Bullish / H4-Bullish / M15-BOS_Confirmed',entry_price:e,stop_loss:sl,take_profit_1:tp,take_profit_2:null,
+  risk_reward_ratio:3.6,suggested_position_risk_percent:1,entry_type:'LIMIT',amd_phase:'DISTRIBUTION',law_of_power_ratio:1.83,
+  verdict:`LONG @ ${fp(e)} | SL: ${fp(sl)} | TP: ${fp(tp)} | RR: 3.60 | Quality: 88% (Демо)`,
+  reason:'ДЕМО-ДАННЫЕ. Тест зоны Order Block после съёма EQL ликвидности. Подтверждён BOS на M15. Коррекция заняла в 1.8 раз больше баров, чем импульс.',
+  score_breakdown:{htf_sync:100,sweep:100,fvg:100,law_of_power:100,ltf_confirm:100,total:88}};
+ return {cd,an,sig};
+}
+
+/* ---------- Загрузка и рендер ---------- */
+const status=t=>$('#st').textContent=t;
+function banner(t){const b=$('#banner');b.style.display=t?'block':'none';b.textContent=t||''}
+async function loadList(){
+ try{S.tickers=await api('/api/v1/tickers');S.demo=false;banner('')}
+ catch(e){S.demo=true;S.tickers=[['BTC','CRYPTO'],['ETH','CRYPTO'],['XAUUSD','COMMODITIES'],['CL','COMMODITIES'],['TSLA','STOCKS']].map(([ticker,market])=>({ticker,name:ticker,market}));
+  banner('Демо-режим, данные синтетические. Причина: '+e.message)}
+ renderList();
+}
+async function loadSigs(){
+ if(S.demo){S.sigs=[demoData().sig];}else{try{S.sigs=await api('/api/v1/signals/active')}catch(e){S.sigs=[]}}
+ renderSigs();
+}
+async function load(){
+ $('#tk').textContent=S.T;status('загрузка…');localStorage.smcT=S.T;renderList();renderSigs();
+ let sig=S.sigs.find(s=>s.ticker===S.T),scan=null;
+ try{
+  if(S.demo){const d=demoData();S.cd=d.cd;S.an=d.an;sig=sig||d.sig}
+  else{const [c,a]=await Promise.all([api(`/api/v1/candles/${S.T}?tf=${S.tf}&limit=500`),api(`/api/v1/analysis/${S.T}?tf=${S.tf}&limit=500`)]);
+   S.cd=c.map(k=>({time:k.ts/1000,open:k.open,high:k.high,low:k.low,close:k.close}));S.an=a;
+   if(!sig)scan=await api('/api/v1/scan/'+S.T).catch(()=>null)}
+  ser.setData(S.cd);markers();signalLines(sig);redraw();
+  const l=S.cd[S.cd.length-1];$('#px').textContent=fp(l.close);status(S.demo?'демо':'обновлено '+new Date().toLocaleTimeString());
+ }catch(e){status('ошибка: '+e.message)}
+ renderPanel(sig,scan);
+}
+function pick(t){S.T=t;load()}
+
+function renderList(){
+ const q=$('#q').value.trim().toUpperCase();let h='',m='';
+ S.tickers.filter(t=>!q||t.ticker.includes(q)||(t.name||'').toUpperCase().includes(q)).forEach(t=>{
+  if(t.market!==m){m=t.market;h+=`<div class="mk">${MK[m]||m}</div>`}
+  h+=`<div class="it ${t.ticker===S.T?'sel':''}" onclick="pick('${esc(t.ticker)}')"><b>${esc(t.ticker)}</b> <span class="m">${esc(t.name||'')}</span></div>`});
+ $('#list').innerHTML=h||'<div class="m">Ничего не найдено</div>';
+}
+function renderSigs(){
+ $('#sigs').innerHTML=S.sigs.map(s=>`<div class="it ${s.ticker===S.T?'sel':''}" onclick="pick('${esc(s.ticker)}')">
+  <div class="row"><b>${esc(s.ticker)}</b><span class="bd ${s.direction==='LONG'?'L':'S'}">${s.direction}</span></div>
+  <div class="row m"><span>Q ${Math.round(s.quality_score)}% · RR ${s.risk_reward_ratio}</span><span>${s.risk_level}</span></div></div>`).join('')||'<div class="m">Сигналов нет</div>';
+}
+function renderPanel(sig,scan){
+ const A=S.an||{},lop=A.law_of_power;let h='';
+ if(sig){
+  const q=sig.quality_score,c=q>=80?'var(--g)':q>=60?'var(--a)':'var(--r)',L=sig.direction==='LONG',sb=sig.score_breakdown||{};
+  h+=`<div class="card"><div class="row"><div><div class="big ${L?'g':'r'}">${sig.direction} ${esc(sig.ticker)}</div>
+   <div class="m">${esc(sig.entry_type)} · риск ${sig.suggested_position_risk_percent}%</div><div class="m">${esc(sig.timeframe_sync)}</div></div>
+   <div class="ring" style="background:conic-gradient(${c} ${q}%,var(--b) 0)"><i>${Math.round(q)}%</i></div></div></div>
+   <div class="card kv"><span class="m">Entry</span><b style="color:var(--bl)">${fp(sig.entry_price)}</b>
+    <span class="m">Stop Loss</span><b class="r">${fp(sig.stop_loss)}</b>
+    <span class="m">Take Profit 1</span><b class="g">${fp(sig.take_profit_1)}</b>
+    ${sig.take_profit_2!=null?`<span class="m">Take Profit 2</span><b class="g">${fp(sig.take_profit_2)}</b>`:''}
+    <span class="m">Risk / Reward</span><b>1 : ${sig.risk_reward_ratio}</b>
+    <span class="m">Уровень риска</span><b style="color:${c}">${sig.risk_level}</b>
+    <span class="m">Фаза AMD</span><b>${esc(sig.amd_phase)}</b></div>
+   <div class="card"><h3 style="margin-top:0">Quality Score</h3>${[['HTF Sync · 30%','htf_sync'],['Sweep · 25%','sweep'],['FVG · 20%','fvg'],['Law of Power · 15%','law_of_power'],['LTF Confirm · 10%','ltf_confirm']]
+    .map(([n,k])=>`<div class="sc"><span class="m">${n}</span><div class="bar"><u style="width:${sb[k]||0}%"></u></div><b>${Math.round(sb[k]||0)}</b></div>`).join('')}</div>
+   <div class="card"><div class="vd">${esc(sig.verdict)}</div><p class="rs" style="margin-top:8px">${esc(sig.reason)}</p></div>`;
+ }else{
+  h+=`<div class="card"><div class="big">Нет активного сигнала</div><div class="m">Bias: ${esc(A.bias||'—')} · фаза ${esc(A.amd_phase||'—')}</div></div>`;
+  if(scan){h+=`<div class="card"><h3 style="margin-top:0">Bias по ТФ</h3><div class="kv">${Object.entries(scan.biases).map(([k,v])=>`<span class="m">${k}</span><b>${esc(v)}</b>`).join('')}</div></div>
+   <div class="card"><h3 style="margin-top:0">Почему нет входа</h3>${scan.rejections.map(r=>`<p class="rs">• ${esc(r)}</p>`).join('')}</div>`}
+ }
+ if(lop){const mx=Math.max(lop.impulse_bars,lop.correction_bars,1),ok=lop.ratio>=1.5;
+  h+=`<div class="card"><h3 style="margin-top:0">Закон Силы (${S.tf})</h3>
+   <div class="sc"><span class="m">Импульс</span><div class="bar"><u style="width:${lop.impulse_bars/mx*100}%;background:var(--g)"></u></div><b>${lop.impulse_bars}</b></div>
+   <div class="sc"><span class="m">Коррекция</span><div class="bar"><u style="width:${lop.correction_bars/mx*100}%;background:var(--a)"></u></div><b>${lop.correction_bars}</b></div>
+   <div class="row"><span class="m">N_corr / N_imp</span><b class="${ok?'g':lop.ratio>=1?'':'r'}">${(+lop.ratio).toFixed(2)} ${ok?'· сильный':lop.ratio>=1?'· умеренный':'· слабый'}</b></div></div>`}
+ $('#panel').innerHTML=h;
+}
+
+/* ---------- Инициализация ---------- */
+$('#tfs').innerHTML=['D1','H4','H1','M15'].map(t=>`<button data-t="${t}" class="${t===S.tf?'on':''}">${t}</button>`).join(' ');
+$('#tfs').onclick=e=>{const t=e.target.dataset.t;if(!t)return;S.tf=t;document.querySelectorAll('#tfs button').forEach(b=>b.classList.toggle('on',b.dataset.t===t));load()};
+$('#lay').innerHTML=Object.entries(LAY).map(([k,v])=>`<label><input type="checkbox" ${S.on[k]?'checked':''} data-k="${k}" style="width:auto;margin:0"> ${v}</label>`).join('');
+$('#lay').onchange=e=>{S.on[e.target.dataset.k]=e.target.checked?1:0;redraw()};
+$('#q').oninput=renderList;
+$('#api').value=S.api;
+$('#api').onchange=async e=>{S.api=e.target.value.replace(/\/$/,'');localStorage.smcApi=S.api;await start()};
+async function start(){await loadList();await loadSigs();await load()}
+start();
+setInterval(async()=>{
+ if(S.demo){await loadList();if(S.demo)return;await loadSigs();return load()}   // бэкенд мог подняться — переподключаемся
+ await loadSigs();load();
+},60000);
+</script>
+</body>
+</html>
