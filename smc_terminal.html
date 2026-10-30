@@ -257,7 +257,7 @@ $('#tfs').onclick=e=>{const t=e.target.dataset.t;if(!t)return;C.tf=t;document.qu
 const elKlass = $('#класть'); if (elKlass) elKlass.innerHTML = Object.entries(KLASS).map(([k, v]) => `<label><input type="checkbox"${C.na && C.na[k] ? ' checked' : ''} data-k="${k}" style="width:auto;margin:0"> ${v}</label>`).join('');
 const elKlassChange = $('#класть'); if (elKlassChange) elKlassChange.onchange = e => { if (e.target.dataset.k) { C.na[e.target.dataset.k] = e.target.checked ? 1 : 0; if (typeof renderList === 'function') renderList(); } };
 $('#q').oninput=renderList;
-$('#api').value=C.API;
+const elApi = $('#api'); if (elApi) elApi.value = (typeof C !== 'undefined' && C.API) ? C.API : 'https://smc-backend-g3kj.onrender.com';
 $('#api').oninput=async e=>{C.API=e.target.value.replace(/\/$/, '');localStorage.smcApi=C.API;await start();};
 async function start(){await loadList();await loadSigs();await load();}
 start();
