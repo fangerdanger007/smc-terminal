@@ -255,7 +255,7 @@ function renderPanel(sig,scan){
 $('#tfs').innerHTML = ['D1', 'H4', 'H1', 'M15'].map(t => `<button data-t="${t}" class="${t === (window.C ? C.tf : 'D1') ? 'active' : ''}">${t}</button>`).join(' ');
 $('#tfs').onclick=e=>{const t=e.target.dataset.t;if(!t)return;C.tf=t;document.querySelectorAll('#tfs button').forEach(b=>b.classList.toggle('active',b.dataset.t===t));load();};
 const elKlass = $('#класть'); if (elKlass) elKlass.innerHTML = Object.entries(KLASS).map(([k, v]) => `<label><input type="checkbox"${C.na && C.na[k] ? ' checked' : ''} data-k="${k}" style="width:auto;margin:0"> ${v}</label>`).join('');
-$('#класть').onchange=e=>{C.na[e.target.dataset.k]=e.target.checked?1:0;renderList();};
+const elKlassChange = $('#класть'); if (elKlassChange) elKlassChange.onchange = e => { if (e.target.dataset.k) { C.na[e.target.dataset.k] = e.target.checked ? 1 : 0; if (typeof renderList === 'function') renderList(); } };
 $('#q').oninput=renderList;
 $('#api').value=C.API;
 $('#api').oninput=async e=>{C.API=e.target.value.replace(/\/$/, '');localStorage.smcApi=C.API;await start();};
