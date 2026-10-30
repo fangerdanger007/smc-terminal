@@ -191,7 +191,7 @@ async function loadList(){
  renderList();
 }
 async function loadSigs(){
- if(S.demo){S.sigs=[demoData().sig];}else{try{S.sigs=await api('/api/v1/signals/active')}catch(e){S.sigs=[]}}
+let sigsData = await api(`/signals?tf=${C.tf}`) || {}; let sigs = sigsData.sig || [];
  renderSigs();
 }
 async function load(){
