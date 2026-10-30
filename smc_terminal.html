@@ -254,7 +254,7 @@ function renderPanel(sig,scan){
 /* ---------- Инициализация ---------- */
 $('#tfs').innerHTML=['D1', 'H4', 'H1', 'M15'].map(t=>`<button data-t="${t}" class="${t===C.tf?'active':''}">${t}</button>`).join(' ');
 $('#tfs').onclick=e=>{const t=e.target.dataset.t;if(!t)return;C.tf=t;document.querySelectorAll('#tfs button').forEach(b=>b.classList.toggle('active',b.dataset.t===t));load();};
-$('#класть').innerHTML=Object.entries(KLASS).map(([k,v])=>`<label><input type="checkbox"${C.na[k]?' checked':''} data-k="${k}" style="width:auto;margin:0">${v}</label>`).join('');
+$('#класть').innerHTML = Object.entries(KLASS).map(([k, v]) => `<label><input type="checkbox"${C.na[k] ? ' checked' : ''} data-k="${k}" style="width:auto;margin:0"> ${v}</label>`).join('');
 $('#класть').onchange=e=>{C.na[e.target.dataset.k]=e.target.checked?1:0;renderList();};
 $('#q').oninput=renderList;
 $('#api').value=C.API;
